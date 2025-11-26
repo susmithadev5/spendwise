@@ -1,0 +1,18 @@
+# IDE files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Gradle
+.gradle/
+/build/
+/app/build/
+/app/.cxx/
+/app/.externalNativeBuild/
+local.properties
+
+
+# Logs / dumps
+*.log
+*.hprof

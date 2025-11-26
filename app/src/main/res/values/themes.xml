@@ -1,0 +1,12 @@
+<resources>
+
+    <!-- Light / default theme -->
+    <style name="Theme.Spendwise" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Customize your theme here as needed -->
+
+        <!-- Optional: transparent system bars if you like -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+
+</resources>
