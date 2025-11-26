@@ -10,19 +10,28 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import com.example.spendwise.auth.AuthRepository
 import com.example.spendwise.ui.screens.HomeScreen
+import com.example.spendwise.ui.screens.AddExpenseScreen
+import com.example.spendwise.ui.screens.EditExpenseScreen
 import com.example.spendwise.ui.screens.LoginScreen
 import com.example.spendwise.ui.screens.SignupScreen
 import com.example.spendwise.ui.screens.SplashScreen
 import com.example.spendwise.viewmodel.AuthViewModel
+import com.example.spendwise.viewmodel.ExpenseViewModel
 import com.example.spendwise.viewmodel.SplashViewModel
+import androidx.compose.ui.platform.LocalContext
 
 object NavRoutes {
     const val Splash = "splash"
     const val Login = "login"
     const val Signup = "signup"
     const val Home = "home"
+    const val AddExpense = "add_expense"
+    const val EditExpense = "edit_expense"
+    const val ExpenseId = "expenseId"
 }
 
 @Composable
@@ -30,9 +39,12 @@ fun SpendWiseNavHost(
     authRepository: AuthRepository,
     navController: NavHostController = rememberNavController()
 ) {
+    val context = LocalContext.current.applicationContext
     val authViewModel: AuthViewModel = viewModel(factory = AuthViewModel.provideFactory(authRepository))
     val splashViewModel: SplashViewModel =
         viewModel(factory = SplashViewModel.provideFactory(authRepository))
+    val expenseViewModel: ExpenseViewModel =
+        viewModel(factory = ExpenseViewModel.provideFactory(context))
 
     val navigateToHome: () -> Unit = {
         navController.navigate(NavRoutes.Home) {
@@ -56,7 +68,17 @@ fun SpendWiseNavHost(
         signupDestination(authViewModel, navigateToHome) {
             navController.popBackStack()
         }
-        homeDestination(authViewModel, navigateToLogin)
+        homeDestination(
+            authViewModel = authViewModel,
+            expenseViewModel = expenseViewModel,
+            onLogout = navigateToLogin,
+            onAddExpense = { navController.navigate(NavRoutes.AddExpense) },
+            onExpenseClick = { expenseId ->
+                navController.navigate("${NavRoutes.EditExpense}/$expenseId")
+            }
+        )
+        addExpenseDestination(expenseViewModel) { navController.popBackStack() }
+        editExpenseDestination(expenseViewModel) { navController.popBackStack() }
     }
 }
 
@@ -130,18 +152,81 @@ private fun NavGraphBuilder.signupDestination(
 
 private fun NavGraphBuilder.homeDestination(
     authViewModel: AuthViewModel,
-    onLogout: () -> Unit
+    expenseViewModel: ExpenseViewModel,
+    onLogout: () -> Unit,
+    onAddExpense: () -> Unit,
+    onExpenseClick: (Int) -> Unit
 ) {
     composable(NavRoutes.Home) {
         val uiState by authViewModel.uiState.collectAsState()
+        val expenses by expenseViewModel.expenses.collectAsState()
 
         if (!uiState.isAuthenticated) {
             LaunchedEffect(Unit) { authViewModel.logout(onLogout) }
         } else {
             HomeScreen(
                 userEmail = uiState.currentUserEmail,
+                expenses = expenses,
+                onAddExpense = onAddExpense,
+                onExpenseClick = onExpenseClick,
+                onShowToday = { expenseViewModel.loadExpensesForToday() },
+                onShowMonth = { year, month ->
+                    expenseViewModel.loadExpensesForMonth(year, month)
+                },
+                onShowAll = { expenseViewModel.loadAllExpenses() },
                 onLogout = { authViewModel.logout(onLogout) }
             )
         }
+    }
+}
+
+private fun NavGraphBuilder.addExpenseDestination(
+    expenseViewModel: ExpenseViewModel,
+    onFinished: () -> Unit
+) {
+    composable(NavRoutes.AddExpense) {
+        AddExpenseScreen(
+            onSaveExpense = { amount, category, date, note ->
+                expenseViewModel.addExpense(amount, category, date, note)
+                onFinished()
+            },
+            onNavigateBack = onFinished
+        )
+    }
+}
+
+private fun NavGraphBuilder.editExpenseDestination(
+    expenseViewModel: ExpenseViewModel,
+    onFinished: () -> Unit
+) {
+    composable(
+        route = "${NavRoutes.EditExpense}/{${NavRoutes.ExpenseId}}",
+        arguments = listOf(
+            navArgument(NavRoutes.ExpenseId) { type = NavType.IntType }
+        )
+    ) { backStackEntry ->
+        val expenseId = backStackEntry.arguments?.getInt(NavRoutes.ExpenseId) ?: return@composable
+
+        LaunchedEffect(expenseId) {
+            expenseViewModel.setEditingExpense(expenseId)
+        }
+
+        val editingExpense by expenseViewModel.editingExpense.collectAsState()
+
+        EditExpenseScreen(
+            expense = editingExpense,
+            onSaveChanges = { updated ->
+                expenseViewModel.updateExpense(updated)
+                onFinished()
+            },
+            onDelete = { expense ->
+                expenseViewModel.deleteExpense(expense)
+                onFinished()
+            },
+            onNavigateBack = {
+                expenseViewModel.clearEditingExpense()
+                onFinished()
+            }
+        )
     }
 }
