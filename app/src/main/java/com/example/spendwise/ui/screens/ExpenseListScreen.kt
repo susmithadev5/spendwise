@@ -17,6 +17,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -45,11 +46,16 @@ import java.util.Locale
 fun ExpenseListScreen(
     userEmail: String?,
     expenses: List<Expense>,
+    monthlySpending: Double,
+    currentBudget: Double?,
+    remainingBudget: Double?,
+    isOverBudget: Boolean,
     onAddExpense: () -> Unit,
     onExpenseClick: (Int) -> Unit,
     onShowToday: () -> Unit,
     onShowMonth: (Int, Int) -> Unit,
     onShowAll: () -> Unit,
+    onSetBudget: () -> Unit,
     onLogout: () -> Unit
 ) {
     val dateFormatter = remember { SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()) }
@@ -90,6 +96,15 @@ fun ExpenseListScreen(
             Text(
                 text = userEmail?.let { "Signed in as $it" } ?: "Expense tracker",
                 style = MaterialTheme.typography.bodyMedium
+            )
+
+            BudgetSummary(
+                monthlySpending = monthlySpending,
+                currentBudget = currentBudget,
+                remainingBudget = remainingBudget,
+                isOverBudget = isOverBudget,
+                currencyFormatter = currencyFormatter,
+                onSetBudget = onSetBudget
             )
 
             Row(
@@ -153,6 +168,51 @@ fun ExpenseListScreen(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BudgetSummary(
+    monthlySpending: Double,
+    currentBudget: Double?,
+    remainingBudget: Double?,
+    isOverBudget: Boolean,
+    currencyFormatter: NumberFormat,
+    onSetBudget: () -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text("Spent this month: ${currencyFormatter.format(monthlySpending)}")
+
+            if (currentBudget != null) {
+                Text("Monthly budget: ${currencyFormatter.format(currentBudget)}")
+                val progress = if (currentBudget <= 0) 0f else (monthlySpending / currentBudget).toFloat().coerceIn(0f, 1f)
+                LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+
+                if (remainingBudget != null) {
+                    if (isOverBudget) {
+                        Text(
+                            text = "Over budget by ${currencyFormatter.format(-remainingBudget)}",
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    } else {
+                        Text("Remaining: ${currencyFormatter.format(remainingBudget)}")
+                    }
+                }
+            } else {
+                Text("No budget set")
+            }
+
+            TextButton(onClick = onSetBudget) {
+                Text("Set budget")
             }
         }
     }

@@ -97,14 +97,18 @@ class ExpenseViewModel(
     }
 
     companion object {
-        fun provideFactory(context: Context): ViewModelProvider.Factory =
+        fun provideFactory(repository: ExpenseRepository): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    val database = AppDatabase.getDatabase(context)
-                    val repository = ExpenseRepositoryImpl(database.expenseDao())
                     return ExpenseViewModel(repository) as T
                 }
             }
+
+        fun provideFactory(context: Context): ViewModelProvider.Factory {
+            val database = AppDatabase.getDatabase(context)
+            val repository = ExpenseRepositoryImpl(database.expenseDao())
+            return provideFactory(repository)
+        }
     }
 }

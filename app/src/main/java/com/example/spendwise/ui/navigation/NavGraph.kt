@@ -7,6 +7,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
+import androidx.compose.runtime.remember
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -19,10 +20,15 @@ import com.example.spendwise.ui.screens.EditExpenseScreen
 import com.example.spendwise.ui.screens.LoginScreen
 import com.example.spendwise.ui.screens.SignupScreen
 import com.example.spendwise.ui.screens.SplashScreen
+import com.example.spendwise.ui.screens.SetBudgetScreen
 import com.example.spendwise.viewmodel.AuthViewModel
+import com.example.spendwise.viewmodel.BudgetViewModel
 import com.example.spendwise.viewmodel.ExpenseViewModel
 import com.example.spendwise.viewmodel.SplashViewModel
 import androidx.compose.ui.platform.LocalContext
+import com.example.spendwise.data.local.AppDatabase
+import com.example.spendwise.data.repository.BudgetRepositoryImpl
+import com.example.spendwise.data.repository.ExpenseRepositoryImpl
 
 object NavRoutes {
     const val Splash = "splash"
@@ -32,6 +38,7 @@ object NavRoutes {
     const val AddExpense = "add_expense"
     const val EditExpense = "edit_expense"
     const val ExpenseId = "expenseId"
+    const val SetBudget = "set_budget"
 }
 
 @Composable
@@ -40,11 +47,16 @@ fun SpendWiseNavHost(
     navController: NavHostController = rememberNavController()
 ) {
     val context = LocalContext.current.applicationContext
+    val database = remember { AppDatabase.getDatabase(context) }
+    val expenseRepository = remember { ExpenseRepositoryImpl(database.expenseDao()) }
+    val budgetRepository = remember { BudgetRepositoryImpl(database.budgetDao()) }
     val authViewModel: AuthViewModel = viewModel(factory = AuthViewModel.provideFactory(authRepository))
     val splashViewModel: SplashViewModel =
         viewModel(factory = SplashViewModel.provideFactory(authRepository))
     val expenseViewModel: ExpenseViewModel =
-        viewModel(factory = ExpenseViewModel.provideFactory(context))
+        viewModel(factory = ExpenseViewModel.provideFactory(expenseRepository))
+    val budgetViewModel: BudgetViewModel =
+        viewModel(factory = BudgetViewModel.provideFactory(budgetRepository, expenseRepository))
 
     val navigateToHome: () -> Unit = {
         navController.navigate(NavRoutes.Home) {
@@ -71,14 +83,17 @@ fun SpendWiseNavHost(
         homeDestination(
             authViewModel = authViewModel,
             expenseViewModel = expenseViewModel,
+            budgetViewModel = budgetViewModel,
             onLogout = navigateToLogin,
             onAddExpense = { navController.navigate(NavRoutes.AddExpense) },
             onExpenseClick = { expenseId ->
                 navController.navigate("${NavRoutes.EditExpense}/$expenseId")
-            }
+            },
+            onSetBudget = { navController.navigate(NavRoutes.SetBudget) }
         )
         addExpenseDestination(expenseViewModel) { navController.popBackStack() }
         editExpenseDestination(expenseViewModel) { navController.popBackStack() }
+        setBudgetDestination(budgetViewModel) { navController.popBackStack() }
     }
 }
 
@@ -153,13 +168,19 @@ private fun NavGraphBuilder.signupDestination(
 private fun NavGraphBuilder.homeDestination(
     authViewModel: AuthViewModel,
     expenseViewModel: ExpenseViewModel,
+    budgetViewModel: BudgetViewModel,
     onLogout: () -> Unit,
     onAddExpense: () -> Unit,
-    onExpenseClick: (Int) -> Unit
+    onExpenseClick: (Int) -> Unit,
+    onSetBudget: () -> Unit
 ) {
     composable(NavRoutes.Home) {
         val uiState by authViewModel.uiState.collectAsState()
         val expenses by expenseViewModel.expenses.collectAsState()
+        val monthlySpending by budgetViewModel.monthlySpending.collectAsState()
+        val currentBudget by budgetViewModel.currentBudget.collectAsState()
+        val remainingBudget by budgetViewModel.remainingBudget.collectAsState()
+        val isOverBudget by budgetViewModel.isOverBudget.collectAsState()
 
         if (!uiState.isAuthenticated) {
             LaunchedEffect(Unit) { authViewModel.logout(onLogout) }
@@ -167,6 +188,10 @@ private fun NavGraphBuilder.homeDestination(
             HomeScreen(
                 userEmail = uiState.currentUserEmail,
                 expenses = expenses,
+                monthlySpending = monthlySpending,
+                currentBudget = currentBudget,
+                remainingBudget = remainingBudget,
+                isOverBudget = isOverBudget,
                 onAddExpense = onAddExpense,
                 onExpenseClick = onExpenseClick,
                 onShowToday = { expenseViewModel.loadExpensesForToday() },
@@ -174,6 +199,7 @@ private fun NavGraphBuilder.homeDestination(
                     expenseViewModel.loadExpensesForMonth(year, month)
                 },
                 onShowAll = { expenseViewModel.loadAllExpenses() },
+                onSetBudget = onSetBudget,
                 onLogout = { authViewModel.logout(onLogout) }
             )
         }
@@ -227,6 +253,21 @@ private fun NavGraphBuilder.editExpenseDestination(
                 expenseViewModel.clearEditingExpense()
                 onFinished()
             }
+        )
+    }
+}
+
+private fun NavGraphBuilder.setBudgetDestination(
+    budgetViewModel: BudgetViewModel,
+    onFinished: () -> Unit
+) {
+    composable(NavRoutes.SetBudget) {
+        SetBudgetScreen(
+            onSaveBudget = { amount ->
+                budgetViewModel.setBudget(amount)
+                budgetViewModel.calculateMonthlyTotals()
+            },
+            onNavigateBack = onFinished
         )
     }
 }
