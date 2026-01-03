@@ -21,14 +21,17 @@ import com.example.spendwise.ui.screens.LoginScreen
 import com.example.spendwise.ui.screens.SignupScreen
 import com.example.spendwise.ui.screens.SplashScreen
 import com.example.spendwise.ui.screens.SetBudgetScreen
+import com.example.spendwise.ui.screens.SettingsScreen
 import com.example.spendwise.viewmodel.AuthViewModel
 import com.example.spendwise.viewmodel.BudgetViewModel
 import com.example.spendwise.viewmodel.ExpenseViewModel
+import com.example.spendwise.viewmodel.SettingsViewModel
 import com.example.spendwise.viewmodel.SplashViewModel
 import androidx.compose.ui.platform.LocalContext
 import com.example.spendwise.data.local.AppDatabase
 import com.example.spendwise.data.repository.BudgetRepositoryImpl
 import com.example.spendwise.data.repository.ExpenseRepositoryImpl
+import com.example.spendwise.data.repository.SettingsRepository
 
 object NavRoutes {
     const val Splash = "splash"
@@ -39,11 +42,13 @@ object NavRoutes {
     const val EditExpense = "edit_expense"
     const val ExpenseId = "expenseId"
     const val SetBudget = "set_budget"
+    const val Settings = "settings"
 }
 
 @Composable
 fun SpendWiseNavHost(
     authRepository: AuthRepository,
+    settingsRepository: SettingsRepository,
     navController: NavHostController = rememberNavController()
 ) {
     val context = LocalContext.current.applicationContext
@@ -51,12 +56,21 @@ fun SpendWiseNavHost(
     val expenseRepository = remember { ExpenseRepositoryImpl(database.expenseDao()) }
     val budgetRepository = remember { BudgetRepositoryImpl(database.budgetDao()) }
     val authViewModel: AuthViewModel = viewModel(factory = AuthViewModel.provideFactory(authRepository))
+    val settingsViewModel: SettingsViewModel =
+        viewModel(factory = SettingsViewModel.provideFactory(settingsRepository))
     val splashViewModel: SplashViewModel =
         viewModel(factory = SplashViewModel.provideFactory(authRepository))
     val expenseViewModel: ExpenseViewModel =
         viewModel(factory = ExpenseViewModel.provideFactory(expenseRepository))
     val budgetViewModel: BudgetViewModel =
-        viewModel(factory = BudgetViewModel.provideFactory(budgetRepository, expenseRepository))
+        viewModel(
+            factory = BudgetViewModel.provideFactory(
+                budgetRepository,
+                expenseRepository,
+                settingsRepository,
+                context
+            )
+        )
 
     val navigateToHome: () -> Unit = {
         navController.navigate(NavRoutes.Home) {
@@ -89,11 +103,13 @@ fun SpendWiseNavHost(
             onExpenseClick = { expenseId ->
                 navController.navigate("${NavRoutes.EditExpense}/$expenseId")
             },
-            onSetBudget = { navController.navigate(NavRoutes.SetBudget) }
+            onSetBudget = { navController.navigate(NavRoutes.SetBudget) },
+            onOpenSettings = { navController.navigate(NavRoutes.Settings) }
         )
         addExpenseDestination(expenseViewModel) { navController.popBackStack() }
         editExpenseDestination(expenseViewModel) { navController.popBackStack() }
         setBudgetDestination(budgetViewModel) { navController.popBackStack() }
+        settingsDestination(settingsViewModel) { navController.popBackStack() }
     }
 }
 
@@ -172,7 +188,8 @@ private fun NavGraphBuilder.homeDestination(
     onLogout: () -> Unit,
     onAddExpense: () -> Unit,
     onExpenseClick: (Int) -> Unit,
-    onSetBudget: () -> Unit
+    onSetBudget: () -> Unit,
+    onOpenSettings: () -> Unit
 ) {
     composable(NavRoutes.Home) {
         val uiState by authViewModel.uiState.collectAsState()
@@ -200,6 +217,7 @@ private fun NavGraphBuilder.homeDestination(
                 },
                 onShowAll = { expenseViewModel.loadAllExpenses() },
                 onSetBudget = onSetBudget,
+                onOpenSettings = onOpenSettings,
                 onLogout = { authViewModel.logout(onLogout) }
             )
         }
@@ -268,6 +286,18 @@ private fun NavGraphBuilder.setBudgetDestination(
                 budgetViewModel.calculateMonthlyTotals()
             },
             onNavigateBack = onFinished
+        )
+    }
+}
+
+private fun NavGraphBuilder.settingsDestination(
+    settingsViewModel: SettingsViewModel,
+    onNavigateBack: () -> Unit
+) {
+    composable(NavRoutes.Settings) {
+        SettingsScreen(
+            viewModel = settingsViewModel,
+            onNavigateBack = onNavigateBack
         )
     }
 }

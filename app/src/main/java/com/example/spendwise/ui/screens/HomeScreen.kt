@@ -17,6 +17,7 @@ fun HomeScreen(
     onShowMonth: (Int, Int) -> Unit,
     onShowAll: () -> Unit,
     onSetBudget: () -> Unit,
+    onOpenSettings: () -> Unit,
     onLogout: () -> Unit
 ) {
     ExpenseListScreen(
@@ -32,6 +33,7 @@ fun HomeScreen(
         onShowMonth = onShowMonth,
         onShowAll = onShowAll,
         onSetBudget = onSetBudget,
+        onOpenSettings = onOpenSettings,
         onLogout = onLogout
     )
 }

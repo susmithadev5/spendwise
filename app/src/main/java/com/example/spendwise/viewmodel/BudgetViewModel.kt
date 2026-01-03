@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.spendwise.data.repository.BudgetRepository
 import com.example.spendwise.data.repository.ExpenseRepository
+import com.example.spendwise.data.repository.SettingsRepository
+import com.example.spendwise.notification.NotificationHelper
 import java.util.Calendar
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,7 +17,9 @@ import kotlinx.coroutines.launch
 
 class BudgetViewModel(
     private val budgetRepository: BudgetRepository,
-    private val expenseRepository: ExpenseRepository
+    private val expenseRepository: ExpenseRepository,
+    private val settingsRepository: SettingsRepository,
+    private val appContext: android.content.Context
 ) : ViewModel() {
 
     private val _currentBudget = MutableStateFlow<Double?>(null)
@@ -30,6 +34,9 @@ class BudgetViewModel(
     private val _isOverBudget = MutableStateFlow(false)
     val isOverBudget: StateFlow<Boolean> = _isOverBudget.asStateFlow()
 
+    private val _budgetAlertEnabled = MutableStateFlow(false)
+    private val _hasAlertedThreshold = MutableStateFlow(false)
+
     private val month: Int
     private val year: Int
 
@@ -40,6 +47,7 @@ class BudgetViewModel(
 
         observeBudget()
         observeMonthlyExpenses()
+        observeSettings()
     }
 
     fun setBudget(amount: Double) {
@@ -89,17 +97,43 @@ class BudgetViewModel(
         val spending = _monthlySpending.value
         _remainingBudget.value = budget?.minus(spending)
         _isOverBudget.value = budget != null && spending > budget
+
+        if (_budgetAlertEnabled.value) {
+            val thresholdReached = budget != null && budget > 0 && (spending / budget) >= 0.75
+            if (thresholdReached && !_hasAlertedThreshold.value) {
+                NotificationHelper.showBudgetAlert(appContext)
+                _hasAlertedThreshold.value = true
+            }
+            if (!thresholdReached) {
+                _hasAlertedThreshold.value = false
+            }
+        } else {
+            _hasAlertedThreshold.value = false
+        }
+    }
+
+    private fun observeSettings() {
+        settingsRepository.budgetAlertEnabled
+            .onEach { enabled -> _budgetAlertEnabled.value = enabled }
+            .launchIn(viewModelScope)
     }
 
     companion object {
         fun provideFactory(
             budgetRepository: BudgetRepository,
-            expenseRepository: ExpenseRepository
+            expenseRepository: ExpenseRepository,
+            settingsRepository: SettingsRepository,
+            appContext: android.content.Context
         ): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    return BudgetViewModel(budgetRepository, expenseRepository) as T
+                    return BudgetViewModel(
+                        budgetRepository = budgetRepository,
+                        expenseRepository = expenseRepository,
+                        settingsRepository = settingsRepository,
+                        appContext = appContext
+                    ) as T
                 }
             }
     }
