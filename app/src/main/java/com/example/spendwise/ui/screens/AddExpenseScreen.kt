@@ -1,10 +1,9 @@
 package com.example.spendwise.ui.screens
 
 import android.app.DatePickerDialog
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -12,10 +11,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -29,10 +29,12 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -47,12 +49,14 @@ fun AddExpenseScreen(
     onSaveExpense: (Double, String, Long, String) -> Unit,
     onNavigateBack: () -> Unit
 ) {
-    val categories = remember { listOf("Food", "Travel", "Shopping", "Bills", "Other") }
+    val categories = remember { mutableStateListOf("Food", "Travel", "Shopping", "Bills", "Other") }
     var amountInput by rememberSaveable { mutableStateOf("") }
     var selectedCategory by rememberSaveable { mutableStateOf(categories.first()) }
     var selectedDate by rememberSaveable { mutableStateOf(currentDayStart()) }
     var note by rememberSaveable { mutableStateOf("") }
     var amountError by remember { mutableStateOf<String?>(null) }
+    var categoryError by remember { mutableStateOf<String?>(null) }
+    var newCategoryInput by rememberSaveable { mutableStateOf("") }
     var isDropdownExpanded by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     val dateFormatter = remember { SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()) }
@@ -118,16 +122,21 @@ fun AddExpenseScreen(
                 )
             }
 
-            Box {
+            ExposedDropdownMenuBox(
+                expanded = isDropdownExpanded,
+                onExpandedChange = { isDropdownExpanded = it }
+            ) {
                 OutlinedTextField(
                     value = selectedCategory,
                     onValueChange = {},
                     label = { Text("Category") },
                     readOnly = true,
-                    trailingIcon = { Icon(imageVector = Icons.Default.ArrowDropDown, contentDescription = null) },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = isDropdownExpanded)
+                    },
                     modifier = Modifier
+                        .menuAnchor()
                         .fillMaxWidth()
-                        .clickable { isDropdownExpanded = true }
                 )
                 DropdownMenu(
                     expanded = isDropdownExpanded,
@@ -143,6 +152,48 @@ fun AddExpenseScreen(
                         )
                     }
                 }
+            }
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = newCategoryInput,
+                    onValueChange = {
+                        newCategoryInput = it
+                        categoryError = null
+                    },
+                    label = { Text("New category") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+                Button(
+                    onClick = {
+                        val trimmed = newCategoryInput.trim()
+                        if (trimmed.isEmpty()) {
+                            categoryError = "Enter a category name"
+                            return@Button
+                        }
+                        if (categories.any { it.equals(trimmed, ignoreCase = true) }) {
+                            categoryError = "Category already exists"
+                            return@Button
+                        }
+                        categories.add(trimmed)
+                        selectedCategory = trimmed
+                        newCategoryInput = ""
+                        categoryError = null
+                    }
+                ) {
+                    Text("Add")
+                }
+            }
+            if (categoryError != null) {
+                Text(
+                    text = categoryError.orEmpty(),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
 
             OutlinedTextField(

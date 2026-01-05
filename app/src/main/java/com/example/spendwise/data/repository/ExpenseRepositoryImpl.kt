@@ -29,4 +29,8 @@ class ExpenseRepositoryImpl(
         expenseDao.getExpensesForMonth(year, month)
 
     override fun getAllExpenses(): Flow<List<Expense>> = expenseDao.getAllExpenses()
+
+    override suspend fun clearAllExpenses() {
+        expenseDao.clearAllExpenses()
+    }
 }

@@ -11,4 +11,5 @@ interface ExpenseRepository {
     fun getExpensesForDate(date: Long): Flow<List<Expense>>
     fun getExpensesForMonth(year: Int, month: Int): Flow<List<Expense>>
     fun getAllExpenses(): Flow<List<Expense>>
+    suspend fun clearAllExpenses()
 }
