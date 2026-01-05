@@ -29,9 +29,12 @@ import com.example.spendwise.viewmodel.SettingsViewModel
 import com.example.spendwise.viewmodel.SplashViewModel
 import androidx.compose.ui.platform.LocalContext
 import com.example.spendwise.data.local.AppDatabase
+import com.example.spendwise.data.repository.CloudSyncRepositoryImpl
 import com.example.spendwise.data.repository.BudgetRepositoryImpl
 import com.example.spendwise.data.repository.ExpenseRepositoryImpl
 import com.example.spendwise.data.repository.SettingsRepository
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 
 object NavRoutes {
     const val Splash = "splash"
@@ -55,9 +58,25 @@ fun SpendWiseNavHost(
     val database = remember { AppDatabase.getDatabase(context) }
     val expenseRepository = remember { ExpenseRepositoryImpl(database.expenseDao()) }
     val budgetRepository = remember { BudgetRepositoryImpl(database.budgetDao()) }
+    val firebaseAuth = remember { FirebaseAuth.getInstance() }
+    val firestore = remember { FirebaseFirestore.getInstance() }
+    val cloudSyncRepository = remember {
+        CloudSyncRepositoryImpl(
+            firestore = firestore,
+            expenseRepository = expenseRepository,
+            budgetRepository = budgetRepository,
+            firebaseAuth = firebaseAuth
+        )
+    }
     val authViewModel: AuthViewModel = viewModel(factory = AuthViewModel.provideFactory(authRepository))
     val settingsViewModel: SettingsViewModel =
-        viewModel(factory = SettingsViewModel.provideFactory(settingsRepository))
+        viewModel(
+            factory = SettingsViewModel.provideFactory(
+                settingsRepository = settingsRepository,
+                cloudSyncRepository = cloudSyncRepository,
+                firebaseAuth = firebaseAuth
+            )
+        )
     val splashViewModel: SplashViewModel =
         viewModel(factory = SplashViewModel.provideFactory(authRepository))
     val expenseViewModel: ExpenseViewModel =
